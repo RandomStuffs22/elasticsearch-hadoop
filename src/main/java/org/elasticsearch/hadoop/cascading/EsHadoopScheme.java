@@ -66,6 +66,17 @@ class EsHadoopScheme extends Scheme<JobConf, RecordReader, OutputCollector, Obje
     private boolean IS_ES_10;
 
     private static Log log = LogFactory.getLog(EsHadoopScheme.class);
+    private static final Class<?> COERCIBLE_TYPE;
+
+    static {
+        Class<?> type = null;
+        try {
+            type = Class.forName("cascading.tuple.type.CoercibleType", false, Scheme.class.getClassLoader());
+        } catch (Exception ex) {
+            type = null;
+        }
+        COERCIBLE_TYPE = type;
+    }
 
     EsHadoopScheme(String nodes, int port, String index, String query, Fields fields) {
         this.index = index;
@@ -179,7 +190,7 @@ class EsHadoopScheme extends Scheme<JobConf, RecordReader, OutputCollector, Obje
                 }
                 else {
                     lookupKey.set(alias.toES(field.toString()));
-                    entry.setObject(field, data.get(lookupKey));
+                    setObject(entry, field, data.get(lookupKey));
                 }
             }
         }
@@ -191,6 +202,16 @@ class EsHadoopScheme extends Scheme<JobConf, RecordReader, OutputCollector, Obje
         }
 
         return true;
+    }
+
+    private void setObject(TupleEntry entry, Comparable<?> field, Object object) {
+        if (COERCIBLE_TYPE != null && object != null
+                && COERCIBLE_TYPE.isAssignableFrom(entry.getFields().getTypeClass(field))) {
+            entry.setObject(field, object.toString());
+        }
+        else {
+            entry.setObject(field, object);
+        }
     }
 
     @SuppressWarnings("unchecked")
